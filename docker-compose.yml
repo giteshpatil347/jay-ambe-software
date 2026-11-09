@@ -1,0 +1,74 @@
+# Production-style stack: ONE application container (Spring Boot + the compiled web app) and Postgres.
+# Plain HTTP on APP_PORT by default; built-in HTTPS when SERVER_SSL_ENABLED=true (see .env.example / docs/DEPLOYMENT.md).
+# Networks: edge = published port of the app; internal = no outbound, holds postgres (+ app). Postgres is never published.
+# Uploaded files live on local disk in ./uploads next to this file, TLS certs are read from ./certs (bind mounts).
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      SPRING_PROFILES_ACTIVE: prod   # application-prod.yml: Swagger/API docs off, DB statement timeouts, secure cookie by default
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      JAVA_TOOL_OPTIONS: "-XX:MaxRAMPercentage=70 -XX:+ExitOnOutOfMemoryError"
+      APP_STORAGE_DIR: /app/uploads   # fixed inside the container; the host folder is UPLOADS_DIR below
+      # none = ignore X-Forwarded-* (the port is reached directly: a client could otherwise spoof its IP for the login rate limit).
+      # Set FORWARD_HEADERS_STRATEGY=native in .env ONLY behind your own TLS proxy that overwrites those headers.
+      SERVER_FORWARD_HEADERS_STRATEGY: ${FORWARD_HEADERS_STRATEGY:-none}
+    ports:
+      # host APP_PORT -> container SERVER_PORT (8080 plain HTTP; 8443 when you enable the built-in HTTPS)
+      - "${APP_PORT:-8080}:${SERVER_PORT:-8080}"
+    volumes:
+      # Host folders next to this file. On Linux: sudo chown 10001:10001 uploads (certs: the key must be readable by uid 10001)
+      - ${UPLOADS_DIR:-./uploads}:/app/uploads
+      - ${CERTS_DIR:-./certs}:/certs:ro
+    read_only: true
+    tmpfs:
+      - /tmp
+    cap_drop: [ALL]
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 400
+    mem_limit: 1g
+    logging: &logging
+      driver: json-file
+      options: { max-size: "10m", max-file: "5" }
+    healthcheck:
+      test: ["CMD", "sh", "/app/healthcheck.sh"]
+      interval: 15s
+      timeout: 5s
+      retries: 10
+      start_period: 60s
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [edge, internal]
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    security_opt: ["no-new-privileges:true"]
+    pids_limit: 200
+    mem_limit: 1g
+    logging: *logging
+    networks: [internal]
+
+networks:
+  edge: {}
+  internal:
+    internal: true
+
+volumes:
+  pgdata: {}

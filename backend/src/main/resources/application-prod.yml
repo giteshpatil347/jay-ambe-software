@@ -1,0 +1,29 @@
+# Activated with SPRING_PROFILES_ACTIVE=prod (docker-compose.yml sets it). Only differences from application.yml.
+
+# API docs / Swagger UI describe every endpoint: not served in production.
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
+
+spring:
+  datasource:
+    hikari:
+      # Postgres-side guards: a runaway query or an abandoned transaction cannot hold locks/connections forever.
+      data-source-properties:
+        options: "-c statement_timeout=60000 -c idle_in_transaction_session_timeout=120000"
+  jpa:
+    show-sql: false
+
+app:
+  cors:
+    allowed-origin: ${CORS_ALLOWED_ORIGIN:}   # same origin by default (the app serves the SPA): no CORS; set only for a separate front-end origin
+  auth:
+    cookie-secure: ${AUTH_COOKIE_SECURE:true}   # secure by default; false only for plain-HTTP use (no TLS anywhere in front)
+
+logging:
+  level:
+    root: INFO
+    org.hibernate.SQL: WARN
+    org.springframework.security: WARN

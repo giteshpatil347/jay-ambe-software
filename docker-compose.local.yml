@@ -1,0 +1,4 @@
+# Intentionally empty (no-op). The old nginx-based local override is gone: the app container serves everything itself.
+# Kept only so that `docker compose -f docker-compose.yml -f docker-compose.local.yml ...` keeps working.
+# For https://localhost set in .env: APP_PORT=443 SERVER_PORT=8443 SERVER_SSL_ENABLED=true (see docs/DEPLOYMENT.md).
+services: {}

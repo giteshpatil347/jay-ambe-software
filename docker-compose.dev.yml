@@ -1,0 +1,22 @@
+# Local dev: Postgres only, bound to loopback. Run backend/frontend on the host
+# (the backend stores uploads in ./uploads of the directory it is started from, or APP_STORAGE_DIR).
+#   docker compose --env-file .env -f docker-compose.dev.yml up -d
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_NAME:-materialbook}
+      POSTGRES_USER: ${DB_USER:-materialbook}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?set DB_PASSWORD in .env}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - pgdata-dev:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  pgdata-dev: {}

@@ -1,0 +1,82 @@
+spring:
+  application:
+    name: materialbook
+  mvc:
+    contentnegotiation:
+      media-types:
+        webmanifest: application/manifest+json
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 12MB
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USER}
+    password: ${DB_PASSWORD}
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:10}
+      minimum-idle: 2
+      connection-timeout: 10000      # fail fast (ms) instead of queueing requests when the pool is exhausted
+      idle-timeout: 300000
+      max-lifetime: 1500000          # below typical DB/proxy connection limits
+  jpa:
+    open-in-view: false
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate.jdbc.time_zone: UTC
+  flyway:
+    enabled: true
+  lifecycle:
+    timeout-per-shutdown-phase: 30s
+
+server:
+  port: ${SERVER_PORT:8080}
+  server-header: ""                  # do not advertise the server software
+  shutdown: graceful
+  compression:
+    enabled: true
+    min-response-size: 1KB
+    mime-types: text/html,text/css,application/javascript,text/javascript,application/json,image/svg+xml,application/manifest+json,application/problem+json
+  ssl:
+    # Optional built-in HTTPS (PEM files). Enable with SERVER_SSL_ENABLED=true plus SERVER_SSL_CERTIFICATE and
+    # SERVER_SSL_CERTIFICATE_PRIVATE_KEY (file paths); typically SERVER_PORT=8443. Off = plain HTTP behind your own TLS proxy.
+    enabled: ${SERVER_SSL_ENABLED:false}
+    enabled-protocols: TLSv1.3,TLSv1.2
+  max-http-request-header-size: 16KB
+  tomcat:
+    max-swallow-size: 13MB            # just above the multipart cap, so oversize uploads are rejected, not drained forever
+  forward-headers-strategy: native # honour X-Forwarded-* from a trusted (private-range) reverse proxy: real client IP for rate limiting, scheme for HSTS/cookies
+  error:
+    include-message: never
+    include-stacktrace: never
+    include-binding-errors: never
+    include-exception: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+  endpoint:
+    health:
+      show-details: never
+
+app:
+  cors:
+    allowed-origin: ${CORS_ALLOWED_ORIGIN:http://localhost:5173}   # only for a dev server on another origin; blank = no CORS
+  jwt:
+    secret: ${JWT_SECRET:}            # required, >= 32 bytes; app refuses to start otherwise
+    access-token-ttl: 10m
+  auth:
+    refresh-token-ttl: 7d
+    cookie-secure: ${AUTH_COOKIE_SECURE:true}   # set false only for local http dev
+    max-failed-logins: 5
+    lockout-duration: 15m
+    rate-limit-per-minute: 30         # per IP on /api/v1/auth/**
+    bootstrap-admin:
+      mobile: ${BOOTSTRAP_ADMIN_MOBILE:}
+      password: ${BOOTSTRAP_ADMIN_PASSWORD:}
+      name: ${BOOTSTRAP_ADMIN_NAME:Super Admin}
+  storage:                            # local disk; relative paths resolve against the application's working directory
+    dir: ${APP_STORAGE_DIR:./uploads}
